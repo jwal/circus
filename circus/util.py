@@ -607,7 +607,6 @@ def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
         else:
             raise NotImplemented("No logger configuration parser found.  "
                                  "Try *.ini, *.json or *.yaml")
-        
 
 
 class StrictConfigParser(ConfigParser):
@@ -615,7 +614,7 @@ class StrictConfigParser(ConfigParser):
     def _read(self, fp, fpname):
         cursect = None                        # None, or a dictionary
         optname = None
-        lineno =0 
+        lineno = 0
         e = None                              # None, or an exception
         while True:
             line = fp.readline()
