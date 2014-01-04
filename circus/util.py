@@ -1,4 +1,5 @@
 import logging
+import logging.config
 import os
 import re
 import shlex
@@ -578,18 +579,35 @@ class ObjectDict(dict):
         return self[item]
 
 
-def configure_logger(logger, level='INFO', output="-"):
-    loglevel = LOG_LEVELS.get(level.lower(), logging.INFO)
-    logger.setLevel(loglevel)
-    if output == "-":
-        h = logging.StreamHandler()
+def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
+    if loggerconfig is None:
+        loglevel = LOG_LEVELS.get(level.lower(), logging.INFO)
+        logger.setLevel(loglevel)
+        if output == "-":
+            h = logging.StreamHandler()
+        else:
+            h = logging.FileHandler(output)
+            close_on_exec(h.stream.fileno())
+        fmt = logging.Formatter(LOG_FMT, LOG_DATE_FMT)
+        h.setFormatter(fmt)
+        logger.handlers = [h]
+        logger.propagate = False
     else:
-        h = logging.FileHandler(output)
-        close_on_exec(h.stream.fileno())
-    fmt = logging.Formatter(LOG_FMT, LOG_DATE_FMT)
-    h.setFormatter(fmt)
-    logger.handlers = [h]
-    logger.propagate = False
+        if loggerconfig.endswith(".ini"):
+            logging.config.fileConfig(loggerconfig,
+                                      disable_existing_loggers=True)
+        elif loggerconfig.endswith(".json"):
+            import json
+            with open(loggerconfig, "rb") as fh:
+                logging.config.dictConfig(json.loads(fh.read()))
+        elif loggerconfig.endswith(".yaml"):
+            import yaml
+            with open(loggerconfig, "rb") as fh:
+                logging.config.dictConfig(yaml.load(fh.read()))
+        else:
+            raise NotImplemented("No logger configuration parser found.  "
+                                 "Try *.ini, *.json or *.yaml")
+        
 
 
 class StrictConfigParser(ConfigParser):
@@ -597,7 +615,7 @@ class StrictConfigParser(ConfigParser):
     def _read(self, fp, fpname):
         cursect = None                        # None, or a dictionary
         optname = None
-        lineno = 0
+        lineno =0 
         e = None                              # None, or an exception
         while True:
             line = fp.readline()

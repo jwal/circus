@@ -80,7 +80,8 @@ class Arbiter(object):
                  httpd_host='localhost', httpd_port=8080,
                  httpd_close_outputs=False, debug=False,
                  ssh_server=None, proc_name='circusd', pidfile=None,
-                 loglevel=None, logoutput=None, fqdn_prefix=None, umask=None):
+                 loglevel=None, logoutput=None, loggerconfig=None,
+                 fqdn_prefix=None, umask=None):
 
         self.watchers = watchers
         self.endpoint = endpoint
@@ -94,6 +95,7 @@ class Arbiter(object):
         self.pidfile = pidfile
         self.loglevel = loglevel
         self.logoutput = logoutput
+        self.loggerconfig = None
         self.umask = umask
 
         try:
@@ -422,6 +424,7 @@ class Arbiter(object):
                       pidfile=cfg.get('pidfile', None),
                       loglevel=cfg.get('loglevel', None),
                       logoutput=cfg.get('logoutput', None),
+                      loggerconfig=cfg.get('loggerconfig', None),
                       fqdn_prefix=cfg.get('fqdn_prefix', None),
                       umask=cfg['umask'])
 

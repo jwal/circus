@@ -11,7 +11,7 @@ try:
 except ImportError:
     tests_require.append('unittest2==0.5.1')
 
-install_requires = ['iowait', 'psutil', 'pyzmq', 'tornado']
+install_requires = ['iowait', 'psutil', 'pyzmq', 'tornado', 'pyyaml']
 
 try:
     import argparse     # NOQA
