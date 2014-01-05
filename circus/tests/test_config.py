@@ -254,6 +254,38 @@ class TestConfig(TestCase):
         conf = get_config(_CONF['circus'])
         self.assertEqual(conf['loglevel'], 'debug')
 
+    def test_loggerconfig_default(self):
+        # Start circusd with an example circus.ini file that uses the default
+        # loggerconfig.  Verify that the logs are written to the file specified
+        # in logoutput.
+        self.fail()
+
+    def test_loggerconfig_ini(self):
+        # Start circusd with an example circus.ini file that uses an INI
+        # loggerconfig.  Verify that the logs are written to the file specified
+        # in the example INI file.
+        self.fail()
+
+    def test_loggerconfig_json(self):
+        # Start circusd with an example circus.ini file that uses a JSON
+        # loggerconfig.  Verify that the logs are written to the file specified
+        # in the example JSON file.
+        self.fail()
+
+    def test_loggerconfig_yaml(self):
+        # Start circusd with an example circus.ini file that uses a YAML
+        # loggerconfig.  Verify that the logs are written to the file specified
+        # in the example YAML file.
+        self.fail()
+
+    def test_loggerconfig_option(self):
+        # Start circusd with an example circus.ini file that uses a YAML
+        # loggerconfig.  But override this to use the default loggerconfig
+        # by using the command line option to circusd. Verify that the logs
+        # are written to the file specified by the --log-output command line
+        # option instead of the to file specified in the YAML configuration.
+        self.fail()
+
     def test_override(self):
         conf = get_config(_CONF['multiple_wildcard'])
         watchers = conf['watchers']
