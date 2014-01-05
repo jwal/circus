@@ -586,7 +586,7 @@ class ObjectDict(dict):
 
 
 def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
-    if loggerconfig is None:
+    if loggerconfig is None or loggerconfig.lower().strip() == "default":
         loglevel = LOG_LEVELS.get(level.lower(), logging.INFO)
         logger.setLevel(loglevel)
         if output == "-":

@@ -101,6 +101,10 @@ circus - single section
         The loglevel that we want to see (default: INFO)
     **logoutput**
         The logoutput file where we want to log (default: stdout)
+    **loggerconfig**
+        A path to an INI, JSON or YAML file to configure standard Python logging
+        for the Arbiter.  The special value "default" uses the builtin logging
+	configuration based on the optional loglevel adn logoutput options.
 
 
 watcher:NAME - as many sections as you want
