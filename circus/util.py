@@ -8,6 +8,11 @@ import sys
 import time
 import functools
 import traceback
+import json
+try:
+    import yaml
+except ImportError:
+    yaml = None
 try:
     import pwd
     import grp
@@ -32,6 +37,7 @@ except ImportError:
 from datetime import timedelta
 from functools import wraps
 import signal
+from pipes import quote as shell_escape_arg
 
 try:
     import importlib
@@ -593,20 +599,26 @@ def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
         logger.handlers = [h]
         logger.propagate = False
     else:
-        if loggerconfig.endswith(".ini"):
+        loggerconfig = os.path.abspath(loggerconfig)
+        if loggerconfig.lower().endswith(".ini"):
             logging.config.fileConfig(loggerconfig,
                                       disable_existing_loggers=True)
-        elif loggerconfig.endswith(".json"):
-            import json
+        elif loggerconfig.lower().endswith(".json"):
             with open(loggerconfig, "rb") as fh:
                 logging.config.dictConfig(json.loads(fh.read()))
-        elif loggerconfig.endswith(".yaml"):
-            import yaml
+        elif loggerconfig.lower().endswith(".yaml"):
+            if yaml is None:
+                raise Exception("Logger configuration file %s appears to be "
+                                "a YAML file but PyYAML is not available. "
+                                "Try: pip install PyYAML"
+                                % (shell_escape_arg(loggerconfig),))
             with open(loggerconfig, "rb") as fh:
                 logging.config.dictConfig(yaml.load(fh.read()))
         else:
-            raise NotImplemented("No logger configuration parser found.  "
-                                 "Try *.ini, *.json or *.yaml")
+            raise Exception("Logger configuration file %s is not in one "
+                            "of the recognized formats.  The file name "
+                            "should be: *.ini, *.json or *.yaml."
+                            % (shell_escape_arg(loggerconfig),))
 
 
 class StrictConfigParser(ConfigParser):
