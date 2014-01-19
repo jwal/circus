@@ -43,7 +43,8 @@ def run_circusd(options=(), config=(), log_capture_path="log.txt",
                 fh.write(additional_files[relpath])
         # argv2 = ["cat", "circus.ini"]
         # subprocess.check_call(argv2, cwd=temp_dir)
-        argv = ["python", "-m", "circus.circusd"] + options + [circus_ini_path]
+        argv = ["coverage", "run", "-p", "-m",
+                "circus.circusd"] + options + [circus_ini_path]
         # print "+", " ".join(shell_escape_arg(a) for a in argv)
         child = subprocess.Popen(argv, cwd=temp_dir, stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE, 
@@ -75,6 +76,11 @@ def run_circusd(options=(), config=(), log_capture_path="log.txt",
         assert child.returncode == 0, \
             " ".join(shell_escape_arg(a) for a in argv)
     finally:
+        for basename in sorted(os.listdir(temp_dir)):
+            if basename.startswith(".coverage."):
+                source = os.path.join(temp_dir, basename)
+                target = os.path.abspath(basename)
+                shutil.copy(source, target)
         shutil.rmtree(temp_dir)
 
 EXAMPLE_YAML = """\
