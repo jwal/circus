@@ -12,7 +12,7 @@ import json
 try:
     import yaml
 except ImportError:
-    yaml = None
+    yaml = None # flake8: noqa
 try:
     import pwd
     import grp
