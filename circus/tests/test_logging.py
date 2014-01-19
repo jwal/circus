@@ -2,7 +2,10 @@ try:
     from io import BytesIO as StringIO
 except ImportError:
     from cStringIO import StringIO  # NOQA
-from ConfigParser import ConfigParser
+try:
+    from configparser import ConfigParser
+except ImportError:
+    from ConfigParser import ConfigParser  # NOQA
 from circus.tests.support import TestCase
 from circus.tests.support import EasyTestSuite
 from circus.tests.support import skipIf
