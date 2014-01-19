@@ -1,10 +1,11 @@
 try:
-    from io import StringIO
+    from io import BytesIO as StringIO
 except ImportError:
-    from cStringIO import StringIO # flake8: noqa
+    from cStringIO import StringIO  # NOQA
 from ConfigParser import ConfigParser
 from circus.tests.support import TestCase
 from circus.tests.support import EasyTestSuite
+from circus.tests.support import skipIf
 import os
 import shutil
 import tempfile
@@ -13,6 +14,7 @@ import subprocess
 import time
 import yaml
 import json
+import logging.config
 
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -157,6 +159,10 @@ def logging_dictconfig_to_ini(config):
     return result.getvalue()
 
 
+def hasDictConfig():
+    return hasattr(logging.config, "dictConfig")
+
+
 class TestLoggingConfig(TestCase):
 
     def test_loggerconfig_default_ini(self):
@@ -171,6 +177,7 @@ class TestLoggingConfig(TestCase):
             log_capture_path="log_opt.txt")
         self.assertTrue(EXPECTED_LOG_MESSAGE in logs, logs)
 
+    @skipIf(not hasDictConfig(), "Needs logging.config.dictConfig()")
     def test_loggerconfig_yaml_ini(self):
         config = yaml.load(EXAMPLE_YAML)
         config["handlers"]["logfile"]["filename"] = "log_yaml_ini.txt"
@@ -180,6 +187,7 @@ class TestLoggingConfig(TestCase):
             additional_files={"logging.yaml": yaml.dump(config)})
         self.assertTrue(EXPECTED_LOG_MESSAGE in logs, logs)
 
+    @skipIf(not hasDictConfig(), "Needs logging.config.dictConfig()")
     def test_loggerconfig_yaml_opt(self):
         config = yaml.load(EXAMPLE_YAML)
         config["handlers"]["logfile"]["filename"] = "log_yaml_opt.txt"
@@ -189,6 +197,7 @@ class TestLoggingConfig(TestCase):
             additional_files={"logging.yaml": yaml.dump(config)})
         self.assertTrue(EXPECTED_LOG_MESSAGE in logs, logs)
 
+    @skipIf(not hasDictConfig(), "Needs logging.config.dictConfig()")
     def test_loggerconfig_json_ini(self):
         config = yaml.load(EXAMPLE_YAML)
         config["handlers"]["logfile"]["filename"] = "log_json_ini.txt"
@@ -198,6 +207,7 @@ class TestLoggingConfig(TestCase):
             additional_files={"logging.json": json.dumps(config)})
         self.assertTrue(EXPECTED_LOG_MESSAGE in logs, logs)
 
+    @skipIf(not hasDictConfig(), "Needs logging.config.dictConfig()")
     def test_loggerconfig_json_opt(self):
         config = yaml.load(EXAMPLE_YAML)
         config["handlers"]["logfile"]["filename"] = "log_json_opt.txt"

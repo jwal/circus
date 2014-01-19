@@ -12,7 +12,7 @@ import json
 try:
     import yaml
 except ImportError:
-    yaml = None # flake8: noqa
+    yaml = None  # NOQA
 try:
     import pwd
     import grp
@@ -604,9 +604,21 @@ def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
             logging.config.fileConfig(loggerconfig,
                                       disable_existing_loggers=True)
         elif loggerconfig.lower().endswith(".json"):
+            if not hasattr(logging.config, "dictConfig"):
+                raise Exception("Logger configuration file %s appears to be "
+                                "a JSON file but this version of Python "
+                                "does not support the "
+                                "logging.config.dictConfig function. Try "
+                                "Python 2.7.")
             with open(loggerconfig, "rb") as fh:
                 logging.config.dictConfig(json.loads(fh.read()))
         elif loggerconfig.lower().endswith(".yaml"):
+            if not hasattr(logging.config, "dictConfig"):
+                raise Exception("Logger configuration file %s appears to be "
+                                "a YAML file but this version of Python "
+                                "does not support the "
+                                "logging.config.dictConfig function. Try "
+                                "Python 2.7.")
             if yaml is None:
                 raise Exception("Logger configuration file %s appears to be "
                                 "a YAML file but PyYAML is not available. "
