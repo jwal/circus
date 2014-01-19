@@ -95,7 +95,7 @@ class Arbiter(object):
         self.pidfile = pidfile
         self.loglevel = loglevel
         self.logoutput = logoutput
-        self.loggerconfig = None
+        self.loggerconfig = loggerconfig
         self.umask = umask
 
         try:
