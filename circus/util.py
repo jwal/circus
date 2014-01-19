@@ -610,7 +610,7 @@ def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
                                 "does not support the "
                                 "logging.config.dictConfig function. Try "
                                 "Python 2.7.")
-            with open(loggerconfig, "rb") as fh:
+            with open(loggerconfig, "r") as fh:
                 logging.config.dictConfig(json.loads(fh.read()))
         elif loggerconfig.lower().endswith(".yaml"):
             if not hasattr(logging.config, "dictConfig"):
@@ -624,7 +624,7 @@ def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
                                 "a YAML file but PyYAML is not available. "
                                 "Try: pip install PyYAML"
                                 % (shell_escape_arg(loggerconfig),))
-            with open(loggerconfig, "rb") as fh:
+            with open(loggerconfig, "r") as fh:
                 logging.config.dictConfig(yaml.load(fh.read()))
         else:
             raise Exception("Logger configuration file %s is not in one "

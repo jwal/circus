@@ -1,5 +1,6 @@
 try:
-    from io import BytesIO as StringIO
+    from io import StringIO
+    from io import BytesIO
 except ImportError:
     from cStringIO import StringIO  # NOQA
 try:
@@ -44,11 +45,11 @@ def run_circusd(options=(), config=(), log_capture_path="log.txt",
     temp_dir = tempfile.mkdtemp()
     try:
         circus_ini_path = os.path.join(temp_dir, "circus.ini")
-        with open(circus_ini_path, "wb") as fh:
+        with open(circus_ini_path, "w") as fh:
             config_ini.write(fh)
         for relpath in additional_files:
             path = os.path.join(temp_dir, relpath)
-            with open(path, "wb") as fh:
+            with open(path, "w") as fh:
                 fh.write(additional_files[relpath])
         # argv2 = ["cat", "circus.ini"]
         # subprocess.check_call(argv2, cwd=temp_dir)
@@ -77,11 +78,11 @@ def run_circusd(options=(), config=(), log_capture_path="log.txt",
         log_file_path = os.path.join(temp_dir, log_capture_path)
         # raise Exception(child.stdout.read())
         if os.path.exists(log_file_path):
-            with open(log_file_path, "rb") as fh:
+            with open(log_file_path, "r") as fh:
                 return fh.read()
         else:
             if child.stdout is not None:
-                raise Exception(child.stdout.read())
+                raise Exception(child.stdout.read().decode("ascii"))
         assert child.returncode == 0, \
             " ".join(shell_escape_arg(a) for a in argv)
     finally:
@@ -157,9 +158,18 @@ def logging_dictconfig_to_ini(config):
         ini.add_section(section)
         for key, value in sorted(formatters[formatter].items()):
             ini.set(section, key, value)
-    result = StringIO()
-    ini.write(result)
-    return result.getvalue()
+    try:
+        # Older Python (without io.StringIO/io.BytesIO) and Python 3 use
+        # this code path.
+        result = StringIO()
+        ini.write(result)
+        return result.getvalue()
+    except TypeError:
+        # Python 2.7 has io.StringIO and io.BytesIO but ConfigParser.write
+        # has not been fixed to work with StringIO.
+        result = BytesIO()
+        ini.write(result)
+        return result.getvalue().decode("ascii")
 
 
 def hasDictConfig():
