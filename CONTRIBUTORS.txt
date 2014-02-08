@@ -84,3 +84,4 @@ List of contributors:
 - Fabien Marty <fabien.marty@gmail.com>
 - Scott Maxwell <scott@codecobblers.com>
 - Dong Weiming <ciici123@gmail.com>
+- James Ascroft-Leigh <jwal@jwal.me.uk>
