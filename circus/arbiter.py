@@ -70,6 +70,7 @@ class Arbiter(object):
     - **proc_name** -- the arbiter process name
     - **fqdn_prefix** -- a prefix for the unique identifier of the circus
                          instance on the cluster.
+    - **endpoint_owner** -- unix user to chown the endpoint to if using ipc.
     """
 
     def __init__(self, watchers, endpoint, pubsub_endpoint, check_delay=1.0,
@@ -81,7 +82,7 @@ class Arbiter(object):
                  httpd_close_outputs=False, debug=False,
                  ssh_server=None, proc_name='circusd', pidfile=None,
                  loglevel=None, logoutput=None, loggerconfig=None,
-                 fqdn_prefix=None, umask=None):
+                 fqdn_prefix=None, umask=None, endpoint_owner=None):
 
         self.watchers = watchers
         self.endpoint = endpoint
@@ -97,6 +98,7 @@ class Arbiter(object):
         self.logoutput = logoutput
         self.loggerconfig = loggerconfig
         self.umask = umask
+        self.endpoint_owner = endpoint_owner
 
         try:
             # getfqdn appears to fail in Python3.3 in the unittest
@@ -213,7 +215,8 @@ class Arbiter(object):
             ioloop.install()
             self.loop = ioloop.IOLoop.instance()
         self.ctrl = Controller(self.endpoint, self.multicast_endpoint,
-                               self.context, self.loop, self, self.check_delay)
+                               self.context, self.loop, self, self.check_delay,
+                               self.endpoint_owner)
 
     def get_socket(self, name):
         return self.sockets.get(name, None)
@@ -426,7 +429,8 @@ class Arbiter(object):
                       logoutput=cfg.get('logoutput', None),
                       loggerconfig=cfg.get('loggerconfig', None),
                       fqdn_prefix=cfg.get('fqdn_prefix', None),
-                      umask=cfg['umask'])
+                      umask=cfg['umask'],
+                      endpoint_owner=cfg.get('endpoint_owner', None))
 
         # store the cfg which will be used, so it can be used later
         # for checking if the cfg has been changed
@@ -614,7 +618,7 @@ class Arbiter(object):
     @synchronized("arbiter_reload")
     @gen.coroutine
     @debuglog
-    def reload(self, graceful=True):
+    def reload(self, graceful=True, sequential=False):
         """Reloads everything.
 
         Run the :func:`prereload_fn` callable if any, then gracefuly
@@ -635,7 +639,7 @@ class Arbiter(object):
 
         # gracefully reload watchers
         for watcher in self.iter_watchers():
-            yield watcher._reload(graceful=graceful)
+            yield watcher._reload(graceful=graceful, sequential=sequential)
             tornado_sleep(self.warmup_delay)
 
     def numprocesses(self):
@@ -731,6 +735,10 @@ class Arbiter(object):
     @gen.coroutine
     def restart(self, inside_circusd=False):
         yield self._restart(inside_circusd=inside_circusd)
+
+    @property
+    def endpoint_owner_mode(self):
+        return self.ctrl.endpoint_owner_mode  # just wrap the controller
 
 
 class ThreadedArbiter(Thread, Arbiter):
