@@ -89,9 +89,9 @@ def main():
         "is to write to stdout (you can force it by passing '-' to "
         "this option). Takes a filename otherwise."))
     parser.add_argument("--logger-config", dest="loggerconfig", help=(
-        "The location where a standard Python logger configuration INI "
-        "file can be found.  This can be used to override the default "
-        "logging configuration for the arbiter."))
+        "The location where a standard Python logger configuration INI, "
+        "JSON or YAML file can be found.  This can be used to override "
+        "the default logging configuration for the arbiter."))
 
     parser.add_argument('--daemon', dest='daemonize', action='store_true',
                         help="Start circusd in the background")
