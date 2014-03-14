@@ -24,7 +24,9 @@ except ImportError:
 from tornado.ioloop import IOLoop
 from tornado import gen
 from tornado import concurrent
-from circus.py3compat import integer_types, bytestring, raise_with_tb
+from circus.py3compat import (
+    integer_types, bytestring, raise_with_tb, text_type
+)
 try:
     from configparser import (
         ConfigParser, MissingSectionHeaderError, ParsingError, DEFAULTSECT
@@ -205,7 +207,13 @@ def get_info(process=None, interval=0, with_childs=False):
         info['nice'] = 'Zombie'
 
     try:
-        cmdline = os.path.basename(shlex.split(process.cmdline[0])[0])
+        raw_cmdline = process.cmdline()
+    except TypeError:
+        # psutil <= 1.2.1
+        raw_cmdline = process.cmdline
+
+    try:
+        cmdline = os.path.basename(shlex.split(raw_cmdline[0])[0])
     except (AccessDenied, IndexError):
         cmdline = "N/A"
 
@@ -592,7 +600,7 @@ def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
         if output == "-":
             h = logging.StreamHandler()
         else:
-            h = logging.FileHandler(output)
+            h = logging.handlers.WatchedFileHandler(output)
             close_on_exec(h.stream.fileno())
         fmt = logging.Formatter(LOG_FMT, LOG_DATE_FMT)
         h.setFormatter(fmt)
@@ -684,6 +692,7 @@ class StrictConfigParser(ConfigParser):
                         mo = self.OPTCRE.match(line)    # 2.6
                     if mo:
                         optname, vi, optval = mo.group('option', 'vi', 'value')
+                        self.optionxform = text_type
                         optname = self.optionxform(optname.rstrip())
                         # We don't want to override.
                         if optname in cursect:
