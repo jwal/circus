@@ -1,3 +1,4 @@
+import functools
 import logging
 import logging.config
 import os
@@ -6,7 +7,6 @@ import shlex
 import socket
 import sys
 import time
-import functools
 import traceback
 import json
 try:
@@ -35,6 +35,10 @@ except ImportError:
     from ConfigParser import (  # NOQA
         ConfigParser, MissingSectionHeaderError, ParsingError, DEFAULTSECT
     )
+try:
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse  # NOQA
 
 from datetime import timedelta
 from functools import wraps
@@ -87,8 +91,9 @@ LOG_LEVELS = {
     "info": logging.INFO,
     "debug": logging.DEBUG}
 
-LOG_FMT = r"%(asctime)s [%(process)d] [%(levelname)s] %(message)s"
+LOG_FMT = r"%(asctime)s %(name)s[%(process)d] [%(levelname)s] %(message)s"
 LOG_DATE_FMT = r"%Y-%m-%d %H:%M:%S"
+LOG_DATE_SYSLOG_FMT = r"%b %d %H:%M:%S"
 _SYMBOLS = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
 _all_signals = {}
 
@@ -146,6 +151,12 @@ def get_info(process=None, interval=0, with_childs=False):
 
     If process is None, will return the information about the current process.
     """
+    # XXX moce get_info to circus.process ?
+    from circus.process import (get_children, get_memory_info,
+                                get_cpu_percent, get_memory_percent,
+                                get_cpu_times, get_nice, get_cmdline,
+                                get_create_time, get_username)
+
     if process is None or isinstance(process, int):
         if process is None:
             pid = os.getpid()
@@ -159,24 +170,24 @@ def get_info(process=None, interval=0, with_childs=False):
 
     info = {}
     try:
-        mem_info = process.get_memory_info()
+        mem_info = get_memory_info(process)
         info['mem_info1'] = bytes2human(mem_info[0])
         info['mem_info2'] = bytes2human(mem_info[1])
     except AccessDenied:
         info['mem_info1'] = info['mem_info2'] = "N/A"
 
     try:
-        info['cpu'] = process.get_cpu_percent(interval=interval)
+        info['cpu'] = get_cpu_percent(process, interval=interval)
     except AccessDenied:
         info['cpu'] = "N/A"
 
     try:
-        info['mem'] = round(process.get_memory_percent(), 1)
+        info['mem'] = round(get_memory_percent(process), 1)
     except AccessDenied:
         info['mem'] = "N/A"
 
     try:
-        cpu_times = process.get_cpu_times()
+        cpu_times = get_cpu_times(process)
         ctime = timedelta(seconds=sum(cpu_times))
         ctime = "%s:%s.%s" % (ctime.seconds // 60 % 60,
                               str((ctime.seconds % 60)).zfill(2),
@@ -192,25 +203,18 @@ def get_info(process=None, interval=0, with_childs=False):
         info['pid'] = 'N/A'
 
     try:
-        info['username'] = process.username
+        info['username'] = get_username(process)
     except AccessDenied:
         info['username'] = 'N/A'
 
     try:
-        try:
-            info['nice'] = process.get_nice()
-        except AttributeError:
-            info['nice'] = process.nice
+        info['nice'] = get_nice(process)
     except AccessDenied:
         info['nice'] = 'N/A'
     except NoSuchProcess:
         info['nice'] = 'Zombie'
 
-    try:
-        raw_cmdline = process.cmdline()
-    except TypeError:
-        # psutil <= 1.2.1
-        raw_cmdline = process.cmdline
+    raw_cmdline = get_cmdline(process)
 
     try:
         cmdline = os.path.basename(shlex.split(raw_cmdline[0])[0])
@@ -218,12 +222,14 @@ def get_info(process=None, interval=0, with_childs=False):
         cmdline = "N/A"
 
     try:
-        info['create_time'] = process.create_time
+        info['create_time'] = get_create_time(process)
     except AccessDenied:
         info['create_time'] = 'N/A'
 
     try:
-        info['age'] = time.time() - process.create_time
+        info['age'] = time.time() - get_create_time(process)
+    except TypeError:
+        info['create_time'] = get_create_time(process)
     except AccessDenied:
         info['age'] = 'N/A'
 
@@ -231,7 +237,7 @@ def get_info(process=None, interval=0, with_childs=False):
 
     info['children'] = []
     if with_childs:
-        for child in process.get_children():
+        for child in get_children(process):
             info['children'].append(get_info(child, interval=interval))
 
     return info
@@ -593,19 +599,34 @@ class ObjectDict(dict):
         return self[item]
 
 
+<<<<<<< HEAD
 def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
     if loggerconfig is None or loggerconfig.lower().strip() == "default":
+        root_logger = logging.getLogger()
         loglevel = LOG_LEVELS.get(level.lower(), logging.INFO)
-        logger.setLevel(loglevel)
-        if output == "-":
-            h = logging.StreamHandler()
+        root_logger.setLevel(loglevel)
+        datefmt = LOG_DATE_FMT
+        if output in ("-", "stdout"):
+            handler = logging.StreamHandler()
+        elif output.startswith('syslog://'):
+            # URLs are syslog://host[:port]?facility or syslog:///path?facility
+            info = urlparse(output)
+            facility = 'user'
+            if info.query in logging.handlers.SysLogHandler.facility_names:
+                facility = info.query
+            if info.netloc:
+                address = (info.netloc, info.port or 514)
+            else:
+                address = info.path
+            datefmt = LOG_DATE_SYSLOG_FMT
+            handler = logging.handlers.SysLogHandler(
+                address=address, facility=facility)
         else:
-            h = logging.handlers.WatchedFileHandler(output)
-            close_on_exec(h.stream.fileno())
-        fmt = logging.Formatter(LOG_FMT, LOG_DATE_FMT)
-        h.setFormatter(fmt)
-        logger.handlers = [h]
-        logger.propagate = False
+            handler = logging.handlers.WatchedFileHandler(output)
+            close_on_exec(handler.stream.fileno())
+        formatter = logging.Formatter(fmt=LOG_FMT, datefmt=datefmt)
+        handler.setFormatter(formatter)
+        root_logger.handlers = [handler]
     else:
         loggerconfig = os.path.abspath(loggerconfig)
         if loggerconfig.lower().endswith(".ini"):
@@ -639,6 +660,34 @@ def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
                             "of the recognized formats.  The file name "
                             "should be: *.ini, *.json or *.yaml."
                             % (shell_escape_arg(loggerconfig),))
+=======
+def configure_logger(logger, level='INFO', output="-", name=None):
+    root_logger = logging.getLogger()
+    loglevel = LOG_LEVELS.get(level.lower(), logging.INFO)
+    root_logger.setLevel(loglevel)
+    datefmt = LOG_DATE_FMT
+    if output in ("-", "stdout"):
+        handler = logging.StreamHandler()
+    elif output.startswith('syslog://'):
+        # URLs are syslog://host[:port]?facility or syslog:///path?facility
+        info = urlparse(output)
+        facility = 'user'
+        if info.query in logging.handlers.SysLogHandler.facility_names:
+            facility = info.query
+        if info.netloc:
+            address = (info.netloc, info.port or 514)
+        else:
+            address = info.path
+        datefmt = LOG_DATE_SYSLOG_FMT
+        handler = logging.handlers.SysLogHandler(
+            address=address, facility=facility)
+    else:
+        handler = logging.handlers.WatchedFileHandler(output)
+        close_on_exec(handler.stream.fileno())
+    formatter = logging.Formatter(fmt=LOG_FMT, datefmt=datefmt)
+    handler.setFormatter(formatter)
+    root_logger.handlers = [handler]
+>>>>>>> upstream
 
 
 class StrictConfigParser(ConfigParser):

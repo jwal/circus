@@ -85,4 +85,5 @@ List of contributors:
 - Scott Maxwell <scott@codecobblers.com>
 - Dong Weiming <ciici123@gmail.com>
 - Wynn Wilkes <wynnwilkes@gmail.com>
+- Sylvain Viollon <sviollon@minddistrict.com>
 - James Ascroft-Leigh <jwal@jwal.me.uk>

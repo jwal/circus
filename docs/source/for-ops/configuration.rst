@@ -109,7 +109,13 @@ circus - single section
     **loglevel**
         The loglevel that we want to see (default: INFO)
     **logoutput**
-        The logoutput file where we want to log (default: stdout)
+        The logoutput file where we want to log (default: ``-`` to log
+        on stdout). You can log to a remote syslog by using the
+        following syntax: ``syslog://host:port?facility`` where host
+        is your syslog server, port is optional and facility is the
+        syslog facility to use. If you wish to log to a local syslog
+        you can use ``syslog:///path/to/syslog/socket?facility``
+        instead.
     **loggerconfig**
         A path to an INI, JSON or YAML file to configure standard Python
         logging for the Arbiter.  The special value "default" uses the builtin

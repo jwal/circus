@@ -9,6 +9,13 @@ import pstats
 import shutil
 import functools
 import multiprocessing
+try:
+    import sysconfig
+    DEBUG = sysconfig.get_config_var('Py_DEBUG') == 1
+except ImportError:
+    # py2.6, we don't really care about that flage here
+    # since no one will run Python --with-pydebug in 2.6
+    DEBUG = 0
 
 try:
     from unittest import skip, skipIf, TestCase, TestSuite, findTestCases
@@ -79,13 +86,79 @@ def resolve_name(name):
 _CMD = sys.executable
 
 
+def get_ioloop():
+    from zmq.eventloop.ioloop import ZMQPoller
+    from zmq.eventloop.ioloop import ZMQError, ETERM
+    from tornado.ioloop import PollIOLoop
+
+    class DebugPoller(ZMQPoller):
+        def __init__(self):
+            super(DebugPoller, self).__init__()
+            self._fds = []
+
+        def register(self, fd, events):
+            if fd not in self._fds:
+                self._fds.append(fd)
+            return self._poller.register(fd, self._map_events(events))
+
+        def modify(self, fd, events):
+            if fd not in self._fds:
+                self._fds.append(fd)
+            return self._poller.modify(fd, self._map_events(events))
+
+        def unregister(self, fd):
+            if fd in self._fds:
+                self._fds.remove(fd)
+            return self._poller.unregister(fd)
+
+        def poll(self, timeout):
+            """
+            #737 - For some reason the poller issues events with
+            unexistant FDs, usually with big ints. We have not found yet the
+            reason of this
+            behavior that happens only during the tests. But by filtering out
+            those events, everything works fine.
+
+            """
+            z_events = self._poller.poll(1000*timeout)
+            return [(fd, self._remap_events(evt)) for fd, evt in z_events
+                    if fd in self._fds]
+
+    class DebugLoop(PollIOLoop):
+        def initialize(self, **kwargs):
+            PollIOLoop.initialize(self, impl=DebugPoller(), **kwargs)
+
+        def handle_callback_exception(self, callback):
+            exc_type, exc_value, tb = sys.exc_info()
+            raise exc_value
+
+        @staticmethod
+        def instance():
+            PollIOLoop.configure(DebugLoop)
+            return PollIOLoop.instance()
+
+        def start(self):
+            try:
+                super(DebugLoop, self).start()
+            except ZMQError as e:
+                if e.errno == ETERM:
+                    # quietly return on ETERM
+                    pass
+                else:
+                    raise e
+
+    from tornado import ioloop
+    ioloop.IOLoop.configure(DebugLoop)
+    return ioloop.IOLoop.instance()
+
+
 class TestCircus(AsyncTestCase):
 
     arbiter_factory = get_arbiter
+    arbiters = []
 
     def setUp(self):
         super(TestCircus, self).setUp()
-        self.arbiters = []
         self.files = []
         self.dirs = []
         self.tmpfiles = []
@@ -93,7 +166,7 @@ class TestCircus(AsyncTestCase):
         self.plugins = []
 
     def get_new_ioloop(self):
-        return tornado.ioloop.IOLoop.instance()
+        return get_ioloop()
 
     def tearDown(self):
         for file in self.files + self.tmpfiles:
@@ -104,6 +177,12 @@ class TestCircus(AsyncTestCase):
         self.cli.stop()
         for plugin in self.plugins:
             plugin.stop()
+
+        for arbiter in self.arbiters:
+            if arbiter.running:
+                arbiter.stop()
+
+        self.arbiters = []
         super(TestCircus, self).tearDown()
 
     def make_plugin(self, klass, endpoint=DEFAULT_ENDPOINT_DEALER,
@@ -125,13 +204,14 @@ class TestCircus(AsyncTestCase):
             debug=True, async=True, **kw)
         self.test_file = testfile
         self.arbiter = arbiter
+        self.arbiters.append(arbiter)
         yield self.arbiter.start()
 
     @tornado.gen.coroutine
     def stop_arbiter(self):
         for watcher in self.arbiter.iter_watchers():
             yield self.arbiter.rm_watcher(watcher.name)
-        yield self.arbiter.stop()
+        yield self.arbiter._emergency_stop()
 
     @tornado.gen.coroutine
     def status(self, cmd, **props):
@@ -193,13 +273,12 @@ class TestCircus(AsyncTestCase):
 
         if async:
             arbiter_kw['background'] = False
-            arbiter_kw['loop'] = tornado.ioloop.IOLoop.instance()
+            arbiter_kw['loop'] = get_ioloop()
         else:
             arbiter_kw['background'] = True
 
         arbiter = cls.arbiter_factory([worker], plugins=plugins, **arbiter_kw)
-
-        #arbiter.start()
+        cls.arbiters.append(arbiter)
         return testfile, arbiter
 
     def _run_circus(self, callable_path, plugins=None, stats=False, **kw):
@@ -396,12 +475,14 @@ def run_plugin(klass, config, plugin_info_callback=None, duration=300):
     plugin.statsd = _statsd
 
     deadline = time() + (duration / 1000.)
-    plugin.loop.add_timeout(deadline, plugin.loop.stop)
+    plugin.loop.add_timeout(deadline, plugin.stop)
     plugin.start()
-    if plugin_info_callback:
-        plugin_info_callback(plugin)
+    try:
+        if plugin_info_callback:
+            plugin_info_callback(plugin)
+    finally:
+        plugin.stop()
 
-    plugin.stop()
     return _statsd
 
 
@@ -413,8 +494,10 @@ def async_run_plugin(klass, config, plugin_info_callback, duration=300):
         target=run_plugin,
         args=(klass, config, plugin_info_callback, duration))
     circusctl_process.start()
+
     while queue.empty():
         yield tornado_sleep(.1)
+
     result = queue.get()
     raise tornado.gen.Return(result)
 
