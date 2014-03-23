@@ -599,8 +599,8 @@ class ObjectDict(dict):
         return self[item]
 
 
-<<<<<<< HEAD
-def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
+def configure_logger(logger, level='INFO', output="-", loggerconfig=None,
+                     name=None):
     if loggerconfig is None or loggerconfig.lower().strip() == "default":
         root_logger = logging.getLogger()
         loglevel = LOG_LEVELS.get(level.lower(), logging.INFO)
@@ -660,34 +660,6 @@ def configure_logger(logger, level='INFO', output="-", loggerconfig=None):
                             "of the recognized formats.  The file name "
                             "should be: *.ini, *.json or *.yaml."
                             % (shell_escape_arg(loggerconfig),))
-=======
-def configure_logger(logger, level='INFO', output="-", name=None):
-    root_logger = logging.getLogger()
-    loglevel = LOG_LEVELS.get(level.lower(), logging.INFO)
-    root_logger.setLevel(loglevel)
-    datefmt = LOG_DATE_FMT
-    if output in ("-", "stdout"):
-        handler = logging.StreamHandler()
-    elif output.startswith('syslog://'):
-        # URLs are syslog://host[:port]?facility or syslog:///path?facility
-        info = urlparse(output)
-        facility = 'user'
-        if info.query in logging.handlers.SysLogHandler.facility_names:
-            facility = info.query
-        if info.netloc:
-            address = (info.netloc, info.port or 514)
-        else:
-            address = info.path
-        datefmt = LOG_DATE_SYSLOG_FMT
-        handler = logging.handlers.SysLogHandler(
-            address=address, facility=facility)
-    else:
-        handler = logging.handlers.WatchedFileHandler(output)
-        close_on_exec(handler.stream.fileno())
-    formatter = logging.Formatter(fmt=LOG_FMT, datefmt=datefmt)
-    handler.setFormatter(formatter)
-    root_logger.handlers = [handler]
->>>>>>> upstream
 
 
 class StrictConfigParser(ConfigParser):
