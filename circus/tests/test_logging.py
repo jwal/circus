@@ -59,7 +59,6 @@ def run_circusd(options=(), config=(), log_capture_path="log.txt",
             argv = ["python", "-m"] + argv
         else:
             argv = ["coverage", "run", "-p", "-m"] + argv
-        raise Exception(argv)
         # print "+", " ".join(shell_escape_arg(a) for a in argv)
         child = subprocess.Popen(argv, cwd=temp_dir, stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
