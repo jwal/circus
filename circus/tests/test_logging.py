@@ -19,6 +19,7 @@ import time
 import yaml
 import json
 import logging.config
+import sys
 
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -53,8 +54,12 @@ def run_circusd(options=(), config=(), log_capture_path="log.txt",
                 fh.write(additional_files[relpath])
         # argv2 = ["cat", "circus.ini"]
         # subprocess.check_call(argv2, cwd=temp_dir)
-        argv = ["coverage", "run", "-p", "-m",
-                "circus.circusd"] + options + [circus_ini_path]
+        argv = ["circus.circusd"] + options + [circus_ini_path]
+        if sys.gettrace() is None:
+            argv = ["python", "-m"] + argv
+        else:
+            argv = ["coverage", "run", "-p", "-m"] + argv
+        raise Exception(argv)
         # print "+", " ".join(shell_escape_arg(a) for a in argv)
         child = subprocess.Popen(argv, cwd=temp_dir, stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
