@@ -74,9 +74,9 @@ def get_cpu_times(proc):
 
 def get_nice(proc):
     try:
+        return proc.nice()
+    except (AttributeError, TypeError):
         return proc.get_nice()
-    except AttributeError:
-        return proc.nice
 
 
 def get_cmdline(proc):
@@ -277,6 +277,8 @@ class Process(object):
         if self.pipe_stderr:
             extra['stderr'] = PIPE
 
+        with open('/tmp/dump.txt', 'a+') as f:
+            f.write('running '+str(args))
         self._worker = Popen(args, cwd=self.working_dir,
                              shell=self.shell, preexec_fn=preexec_fn,
                              env=self.env, close_fds=not self.use_fds,

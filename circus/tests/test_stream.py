@@ -11,6 +11,7 @@ from circus.client import make_message
 from circus.tests.support import TestCircus, async_poll_for, truncate_file
 from circus.tests.support import TestCase, EasyTestSuite
 from circus.stream import FileStream, WatchedFileStream
+from circus.stream import TimedRotatingFileStream
 from circus.stream import FancyStdoutStream
 
 
@@ -31,35 +32,30 @@ def run_process(testfile, *args, **kw):
 class TestWatcher(TestCircus):
     dummy_process = 'circus.tests.test_stream.run_process'
 
-    @tornado.gen.coroutine
-    def start_arbiter(self):
-        cls = TestWatcher
-        fd, cls.stdout = tempfile.mkstemp()
+    def setUp(self):
+        super(TestWatcher, self).setUp()
+        fd, self.stdout = tempfile.mkstemp()
         os.close(fd)
-        fd, cls.stderr = tempfile.mkstemp()
+        fd, self.stderr = tempfile.mkstemp()
         os.close(fd)
-        cls.stdout_stream = FileStream(cls.stdout)
-        cls.stderr_stream = FileStream(cls.stderr)
-        stdout = {'stream': cls.stdout_stream}
-        stderr = {'stream': cls.stderr_stream}
-        self.file, self.arbiter = cls._create_circus(cls.dummy_process,
-                                                     stdout_stream=stdout,
-                                                     stderr_stream=stderr,
-                                                     debug=True, async=True)
-        yield self.arbiter.start()
+        self.stdout_stream = FileStream(self.stdout)
+        self.stderr_stream = FileStream(self.stderr)
+        self.stdout_arg = {'stream': self.stdout_stream}
+        self.stderr_arg = {'stream': self.stderr_stream}
+
+    def tearDown(self):
+        self.stdout_stream.close()
+        self.stderr_stream.close()
+        if os.path.exists(self.stdout):
+            os.remove(self.stdout)
+        if os.path.exists(self.stderr):
+            os.remove(self.stderr)
 
     @tornado.gen.coroutine
-    def stop_arbiter(self):
-        cls = TestWatcher
-        yield self.arbiter.stop()
-        cls.stdout_stream.close()
-        cls.stderr_stream.close()
-        if os.path.exists(self.file):
-            os.remove(self.file)
-        if os.path.exists(self.stdout):
-            os.remove(cls.stdout)
-        if os.path.exists(self.stderr):
-            os.remove(cls.stderr)
+    def _start_arbiter(self):
+        yield self.start_arbiter(cmd=self.dummy_process,
+                                 stdout_stream=self.stdout_arg,
+                                 stderr_stream=self.stderr_arg)
 
     @tornado.gen.coroutine
     def restart_arbiter(self):
@@ -73,7 +69,7 @@ class TestWatcher(TestCircus):
 
     @tornado.testing.gen_test
     def test_file_stream(self):
-        yield self.start_arbiter()
+        yield self._start_arbiter()
         stream = FileStream(self.stdout, max_bytes='12', backup_count='3')
         self.assertTrue(isinstance(stream._max_bytes, int))
         self.assertTrue(isinstance(stream._backup_count, int))
@@ -82,7 +78,7 @@ class TestWatcher(TestCircus):
 
     @tornado.testing.gen_test
     def test_watched_file_stream(self):
-        yield self.start_arbiter()
+        yield self._start_arbiter()
         stream = WatchedFileStream(self.stdout,
                                    time_format='%Y-%m-%d %H:%M:%S')
         self.assertTrue(isinstance(stream._time_format, str))
@@ -90,8 +86,25 @@ class TestWatcher(TestCircus):
         stream.close()
 
     @tornado.testing.gen_test
+    def test_timed_rotating_file_stream(self):
+        yield self._start_arbiter()
+        stream = TimedRotatingFileStream(self.stdout,
+                                         rotate_when='H',
+                                         rotate_interval='5',
+                                         backup_count='3',
+                                         utc='True')
+        self.assertTrue(isinstance(stream._interval, int))
+        self.assertTrue(isinstance(stream._backup_count, int))
+        self.assertTrue(isinstance(stream._utc, bool))
+        self.assertTrue(stream._suffix is not None)
+        self.assertTrue(stream._ext_match is not None)
+        self.assertTrue(stream._rollover_at > 0)
+        yield self.stop_arbiter()
+        stream.close()
+
+    @tornado.testing.gen_test
     def test_stream(self):
-        yield self.start_arbiter()
+        yield self._start_arbiter()
         # wait for the process to be started
         res1 = yield async_poll_for(self.stdout, 'stdout')
         res2 = yield async_poll_for(self.stderr, 'stderr')

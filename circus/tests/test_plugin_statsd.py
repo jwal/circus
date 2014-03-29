@@ -21,14 +21,16 @@ class TestFullStats(TestCircus):
         gauges = yield async_run_plugin(
             FullStats, config,
             plugin_info_callback=get_gauges,
-            duration=1000)
+            duration=1000,
+            endpoint=self.arbiter.endpoint,
+            pubsub_endpoint=self.arbiter.pubsub_endpoint)
 
         # we should have a bunch of stats events here
         self.assertTrue(len(gauges) >= 5)
         last_batch = sorted(name for name, value in gauges[-5:])
-        wanted = ['_stats.test.cpu_max', '_stats.test.cpu_sum',
-                  '_stats.test.mem_max', '_stats.test.mem_sum',
-                  '_stats.test.watchers_num']
+        wanted = ['_stats.test.cpu_sum', '_stats.test.mem_max',
+                  '_stats.test.mem_pct_max', '_stats.test.mem_pct_sum',
+                  '_stats.test.mem_sum']
         self.assertEqual(last_batch, wanted)
 
         yield self.stop_arbiter()
